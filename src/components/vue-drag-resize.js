@@ -11,13 +11,13 @@ const styleMapping = {
     },
 };
 
-function addEvents(events) {
+function addEvents (events) {
     events.forEach((cb, eventName) => {
         document.documentElement.addEventListener(eventName, cb);
     });
 }
 
-function removeEvents(events) {
+function removeEvents (events) {
     events.forEach((cb, eventName) => {
         document.documentElement.removeEventListener(eventName, cb);
     });
@@ -62,77 +62,77 @@ export default {
         gridX: {
             type: Number,
             default: 50,
-            validator(val) {
+            validator (val) {
                 return val >= 0;
             },
         },
         gridY: {
             type: Number,
             default: 50,
-            validator(val) {
+            validator (val) {
                 return val >= 0;
             },
         },
         parentW: {
             type: Number,
             default: 0,
-            validator(val) {
+            validator (val) {
                 return val >= 0;
             },
         },
         parentH: {
             type: Number,
             default: 0,
-            validator(val) {
+            validator (val) {
                 return val >= 0;
             },
         },
         w: {
             type: [String, Number],
             default: 200,
-            validator(val) {
+            validator (val) {
                 return (typeof val === 'string') ? val === 'auto' : val >= 0;
             },
         },
         h: {
             type: [String, Number],
             default: 200,
-            validator(val) {
+            validator (val) {
                 return (typeof val === 'string') ? val === 'auto' : val >= 0;
             },
         },
         minw: {
             type: Number,
             default: 50,
-            validator(val) {
+            validator (val) {
                 return val >= 0;
             },
         },
         minh: {
             type: Number,
             default: 50,
-            validator(val) {
+            validator (val) {
                 return val >= 0;
             },
         },
         x: {
             type: Number,
             default: 0,
-            validator(val) {
+            validator (val) {
                 return typeof val === 'number';
             },
         },
         y: {
             type: Number,
             default: 0,
-            validator(val) {
+            validator (val) {
                 return typeof val === 'number';
             },
         },
         z: {
             type: [String, Number],
             default: 'auto',
-            validator(val) {
+            validator (val) {
                 return (typeof val === 'string') ? val === 'auto' : val >= 0;
             },
         },
@@ -146,14 +146,14 @@ export default {
         },
         sticks: {
             type: Array,
-            default() {
+            default () {
                 return ['tl', 'tm', 'tr', 'mr', 'br', 'bm', 'bl', 'ml'];
             },
         },
         axis: {
             type: String,
             default: 'both',
-            validator(val) {
+            validator (val) {
                 return ['x', 'y', 'both', 'none'].indexOf(val) !== -1;
             },
         },
@@ -164,7 +164,7 @@ export default {
         },
     },
 
-    data() {
+    data () {
         return {
             fixAspectRatio: null,
             active: null,
@@ -179,9 +179,11 @@ export default {
         };
     },
 
-    beforeCreate() {
-        this.stickDrag = false;
-        this.bodyDrag = false;
+    beforeCreate () {
+        this.stickDragW = false;
+        this.stickDragH = false;
+        this.bodyDragX = false;
+        this.bodyDragY = false;
         this.dimensionsBeforeMove = { pointerX: 0, pointerY: 0, x: 0, y: 0, w: 0, h: 0 };
         this.limits = {
             left: { min: null, max: null },
@@ -193,7 +195,7 @@ export default {
         this.currentStick = null;
     },
 
-    mounted() {
+    mounted () {
         this.parentElement = this.$el.parentNode;
         this.parentWidth = this.parentW ? this.parentW : this.parentElement.clientWidth;
         this.parentHeight = this.parentH ? this.parentH : this.parentElement.clientHeight;
@@ -229,19 +231,19 @@ export default {
         }
     },
 
-    beforeDestroy() {
+    beforeDestroy () {
         removeEvents(this.domEvents);
     },
 
     methods: {
-        deselect() {
+        deselect () {
             if (this.preventActiveBehavior) {
                 return;
             }
             this.active = false;
         },
 
-        move(ev) {
+        move (ev) {
             if (!this.stickDrag && !this.bodyDrag) {
                 return;
             }
@@ -274,7 +276,7 @@ export default {
             }
         },
 
-        up(ev) {
+        up (ev) {
             if (this.stickDrag) {
                 this.stickUp(ev);
             } else if (this.bodyDrag) {
@@ -282,8 +284,8 @@ export default {
             }
         },
 
-        bodyDown(ev) {
-            const { target, button } = ev;
+        bodyDown (ev) {
+            const { target, button, X, Y } = ev;
 
             if (!this.preventActiveBehavior) {
                 this.active = true;
@@ -316,7 +318,12 @@ export default {
             }
 
             if (this.isDraggable) {
-                this.bodyDrag = true;
+                if (X) {
+                    this.bodyDragX = true;
+                }
+                if (Y) {
+                    this.bodyDragY = true;
+                }
             }
 
             const pointerX = typeof ev.pageX !== 'undefined' ? ev.pageX : ev.touches[0].pageX;
@@ -329,7 +336,7 @@ export default {
             }
         },
 
-        bodyMove(delta) {
+        bodyMove (delta) {
             const { dimensionsBeforeMove, parentWidth, parentHeight, gridX, gridY, width, height } = this;
 
             let newTop = dimensionsBeforeMove.top - delta.y;
@@ -382,8 +389,13 @@ export default {
             this.$emit('dragging', this.rect);
         },
 
-        bodyUp() {
-            this.bodyDrag = false;
+        bodyUp ({ X, Y }) {
+            if (X) {
+                this.bodyDragX = false;
+            }
+            if (Y) {
+                this.bodyDragXY = false;
+            }
             this.$emit('dragging', this.rect);
             this.$emit('dragstop', this.rect);
 
@@ -397,12 +409,18 @@ export default {
             };
         },
 
-        stickDown(stick, ev, force = false) {
+        stickDown (stick, ev, force = false) {
             if ((!this.isResizable || !this.active) && !force) {
                 return;
             }
+            let { W, H } = ev
+            if (W) {
+                this.stickDragW = true;
+            }
+            if (H) {
+                this.stickDragH = true;
+            }
 
-            this.stickDrag = true;
 
             const pointerX = typeof ev.pageX !== 'undefined' ? ev.pageX : ev.touches[0].pageX;
             const pointerY = typeof ev.pageY !== 'undefined' ? ev.pageY : ev.touches[0].pageY;
@@ -414,7 +432,7 @@ export default {
             this.limits = this.calcResizeLimits();
         },
 
-        saveDimensionsBeforeMove({ pointerX, pointerY }) {
+        saveDimensionsBeforeMove ({ pointerX, pointerY }) {
             this.dimensionsBeforeMove.pointerX = pointerX;
             this.dimensionsBeforeMove.pointerY = pointerY;
 
@@ -429,7 +447,7 @@ export default {
             this.aspectFactor = this.width / this.height;
         },
 
-        stickMove(delta) {
+        stickMove (delta) {
             const {
                 currentStick,
                 dimensionsBeforeMove,
@@ -444,7 +462,7 @@ export default {
             let newBottom = dimensionsBeforeMove.bottom;
             let newLeft = dimensionsBeforeMove.left;
             let newRight = dimensionsBeforeMove.right;
-            switch(currentStick[0]) {
+            switch (currentStick[0]) {
                 case 'b':
                     newBottom = dimensionsBeforeMove.bottom + delta.y;
 
@@ -466,7 +484,7 @@ export default {
                     break;
             }
 
-            switch(currentStick[1]) {
+            switch (currentStick[1]) {
                 case 'r':
                     newRight = dimensionsBeforeMove.right + delta.x;
 
@@ -512,8 +530,14 @@ export default {
             this.$emit('resizing', this.rect);
         },
 
-        stickUp() {
-            this.stickDrag = false;
+        stickUp (ev) {
+            let { W, H } = ev
+            if (W) {
+                this.stickDragW = false;
+            }
+            if (H) {
+                this.stickDragH = false;
+            }
             this.dimensionsBeforeMove = {
                 pointerX: 0,
                 pointerY: 0,
@@ -533,7 +557,7 @@ export default {
             this.$emit('resizestop', this.rect);
         },
 
-        calcDragLimitation() {
+        calcDragLimitation () {
             const { parentWidth, parentHeight } = this;
 
             return {
@@ -544,7 +568,7 @@ export default {
             };
         },
 
-        calcResizeLimits() {
+        calcResizeLimits () {
             const { aspectFactor, width, height, bottom, top, left, right } = this;
             let { minh: minHeight, minw: minWidth } = this;
 
@@ -610,7 +634,7 @@ export default {
             return limits;
         },
 
-        sideCorrectionByLimit(limit, current) {
+        sideCorrectionByLimit (limit, current) {
             let value = current;
 
             if (limit.min !== null && current < limit.min) {
@@ -622,7 +646,7 @@ export default {
             return value;
         },
 
-        rectCorrectionByLimit(rect) {
+        rectCorrectionByLimit (rect) {
             const { limits } = this;
             let { newRight, newLeft, newBottom, newTop } = rect;
 
@@ -639,7 +663,7 @@ export default {
             };
         },
 
-        rectCorrectionByAspectRatio(rect) {
+        rectCorrectionByAspectRatio (rect) {
             let { newLeft, newRight, newTop, newBottom } = rect;
             const { parentWidth, parentHeight, currentStick, aspectFactor, dimensionsBeforeMove } = this;
 
@@ -679,7 +703,7 @@ export default {
     },
 
     computed: {
-        positionStyle() {
+        positionStyle () {
             return {
                 top: this.top + 'px',
                 left: this.left + 'px',
@@ -687,14 +711,14 @@ export default {
             };
         },
 
-        sizeStyle(){
+        sizeStyle () {
             return {
                 width: this.w == 'auto' ? 'auto' : this.width + 'px',
                 height: this.h == 'auto' ? 'auto' : this.height + 'px'
             };
         },
 
-        vdrStick() {
+        vdrStick () {
             return (stick) => {
                 const stickStyle = {
                     width: `${this.stickSize / this.parentScaleX}px`,
@@ -706,15 +730,15 @@ export default {
             };
         },
 
-        width() {
+        width () {
             return this.parentWidth - this.left - this.right;
         },
 
-        height() {
+        height () {
             return this.parentHeight - this.top - this.bottom;
         },
 
-        rect() {
+        rect () {
             return {
                 left: Math.round(this.left),
                 top: Math.round(this.top),
@@ -725,7 +749,7 @@ export default {
     },
 
     watch: {
-        active(isActive) {
+        active (isActive) {
             if (isActive) {
                 this.$emit('activated');
             } else {
@@ -735,14 +759,14 @@ export default {
 
         isActive: {
             immediate: true,
-            handler(val) {
+            handler (val) {
                 this.active = val;
             },
         },
 
         z: {
             immediate: true,
-            handler(val) {
+            handler (val) {
                 if (val >= 0 || val === 'auto') {
                     this.zIndex = val;
                 }
@@ -750,81 +774,87 @@ export default {
         },
 
         x: {
-            handler(newVal, oldVal) {
-                if (this.stickDrag || this.bodyDrag || (newVal === this.left)) {
+            handler (newVal, oldVal) {
+                if (
+                    this.bodyDragX ||
+                    newVal === this.left
+                ) {
                     return;
                 }
 
                 const delta = oldVal - newVal;
 
-                this.bodyDown({ pageX: this.left, pageY: this.top });
+                this.bodyDown({ pageX: this.left, pageY: this.top, X: true });
                 this.bodyMove({ x: delta, y: 0 });
 
                 this.$nextTick(() => {
-                    this.bodyUp();
+                    this.bodyUp({ X: true });
                 });
             },
         },
 
         y: {
-            handler(newVal, oldVal) {
-                if (this.stickDrag || this.bodyDrag || (newVal === this.top)) {
+            handler (newVal, oldVal) {
+                if (
+                    this.bodyDragY ||
+                    newVal === this.top
+                ) {
                     return;
                 }
 
                 const delta = oldVal - newVal;
 
-                this.bodyDown({ pageX: this.left, pageY: this.top });
+                this.bodyDown({ pageX: this.left, pageY: this.top, Y: true });
                 this.bodyMove({ x: 0, y: delta });
 
                 this.$nextTick(() => {
-                    this.bodyUp();
+                    this.bodyUp(Y: true);
                 });
             },
         },
 
         w: {
-            handler(newVal, oldVal) {
-                if (this.stickDrag || this.bodyDrag || (newVal === this.width)) {
+            handler (newVal, oldVal) {
+                if (this.stickDragW || (newVal === this.width)) {
                     return;
                 }
 
                 const stick = 'mr';
                 const delta = oldVal - newVal;
 
-                this.stickDown(stick, { pageX: this.right, pageY: this.top + (this.height / 2) }, true);
+                this.stickDown(stick, { pageX: this.right, pageY: this.top + (this.height / 2), W: true }, true);
                 this.stickMove({ x: delta, y: 0 });
 
                 this.$nextTick(() => {
-                    this.stickUp();
+                    this.stickUp({ W: true });
                 });
             },
         },
 
         h: {
-            handler(newVal, oldVal) {
-                if (this.stickDrag || this.bodyDrag || (newVal === this.height)) {
+            handler (newVal, oldVal) {
+                if (this.stickDragH || (newVal === this.height)) {
                     return;
                 }
 
                 const stick = 'bm';
                 const delta = oldVal - newVal;
 
-                this.stickDown(stick, { pageX: this.left + (this.width / 2), pageY: this.bottom }, true);
+                this.stickDown(stick, { pageX: this.left + (this.width / 2), pageY: this.bottom, H: true }, true);
                 this.stickMove({ x: 0, y: delta });
 
                 this.$nextTick(() => {
-                    this.stickUp();
+                    this.stickUp({ H: true });
                 });
             },
         },
 
-        parentW(val) {
+        parentW (val) {
             this.right = val - this.width - this.left;
             this.parentWidth = val;
         },
 
-        parentH(val) {
+        parentH (val) {
             this.bottom = val - this.height - this.top;
             this.parentHeight = val;
         },
